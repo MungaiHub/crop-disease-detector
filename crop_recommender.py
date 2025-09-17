@@ -1,9 +1,8 @@
 import streamlit as st
-import pandas as pd
-from PIL import Image
 import random
+from PIL import Image
 
-# --- Step 1: Disease Database ---
+# --- Disease Database (Sample) ---
 disease_db = {
     "Early Blight": {
         "Crop": "Tomato",
@@ -31,24 +30,37 @@ disease_db = {
     }
 }
 
-# --- Step 2: Streamlit UI ---
-st.title("🌱 Plant Disease Scanner & Treatment Recommender")
+# --- App Title ---
+st.title("🌱 Plant Disease Scanner (Upload or Webcam)")
 
-uploaded_file = st.file_uploader("📸 Upload a leaf image", type=["jpg", "jpeg", "png"])
+# --- Step 1: Input Options ---
+st.subheader("📸 Choose how to provide a leaf image")
+option = st.radio("Select input method:", ["Upload from computer", "Use webcam"])
 
-if uploaded_file is not None:
-    image = Image.open(uploaded_file)
-    st.image(image, caption="Uploaded Leaf", use_column_width=True)
+uploaded_image = None
 
+if option == "Upload from computer":
+    uploaded_file = st.file_uploader("📂 Upload a leaf image", type=["jpg", "jpeg", "png"])
+    if uploaded_file is not None:
+        uploaded_image = Image.open(uploaded_file)
+        st.image(uploaded_image, caption="Uploaded Leaf", use_column_width=True)
+
+elif option == "Use webcam":
+    img_file_buffer = st.camera_input("📸 Take a picture of the leaf")
+    if img_file_buffer is not None:
+        uploaded_image = Image.open(img_file_buffer)
+        st.image(uploaded_image, caption="Captured Leaf", use_column_width=True)
+
+# --- Step 2: Run Detection if Image Exists ---
+if uploaded_image is not None:
     st.write("🔍 Scanning leaf for possible diseases...")
 
-    # --- Step 3: Simulated ML Model Prediction ---
-    # In reality, you would load a trained CNN model here
+    # Simulated detection (replace later with CNN model)
     predicted_disease = random.choice(list(disease_db.keys()))
 
     st.subheader(f"✅ Detected Disease: {predicted_disease}")
 
-    # --- Step 4: Show Recommendation ---
+    # --- Step 3: Show Recommendation ---
     info = disease_db[predicted_disease]
     st.write(f"**Crop:** {info['Crop']}")
     st.write(f"**Symptoms:** {info['Symptoms']}")
@@ -57,4 +69,5 @@ if uploaded_file is not None:
     st.write(f"**Dosage & Interval:** {info['Dosage']}")
     st.write(f"**Alternative Practices:** {info['Alternatives']}")
 
-    st.success("ℹ️ Always follow official label instructions approved by regulators (e.g., PCPB in Kenya).")
+    st.success("ℹ️ Always follow official label instructions approved by regulators.")
+
