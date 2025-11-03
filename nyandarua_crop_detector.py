@@ -1,7 +1,6 @@
 import streamlit as st
 import random
 from PIL import Image
-import pandas as pd
 from streamlit_geolocation import streamlit_geolocation
 from math import radians, sin, cos, sqrt, atan2
 
@@ -33,7 +32,7 @@ disease_db = {
     }
 }
 
-# --- Agrovet Database (Constituency + Coordinates) ---
+# --- Agrovet Database --- 
 suppliers = {
     "Kinangop": [
         {"name": "Engineer Agrovet", "ward": "Engineer", "phone": "07XX111222", "lat": -0.682, "lon": 36.650},
@@ -53,12 +52,11 @@ suppliers = {
 }
 
 # --- Title ---
-st.title("🥔 Potato Disease Detection & Agrovet Finder – Nyandarua County")
-st.write("Detect potato diseases, get chemical recommendations, and locate nearby agrovets.")
+st.title("🥔 Potato Disease Detector & Agrovet Finder – Nyandarua County")
 
-# --- Step 1: Image Input ---
+# --- Step 1: Image Upload / Capture ---
 st.subheader("📸 Upload or Capture Potato Leaf Image")
-input_type = st.radio("Choose input method:", ["📂 Upload", "📷 Webcam"])
+input_type = st.radio("Choose input method:", ["📂 Upload", "📷 Camera"])
 
 uploaded_img = None
 if input_type == "📂 Upload":
@@ -66,77 +64,75 @@ if input_type == "📂 Upload":
     if file:
         uploaded_img = Image.open(file)
 else:
-    camera = st.camera_input("Take a photo")
-    if camera:
-        uploaded_img = Image.open(camera)
+    cam = st.camera_input("Take a photo")
+    if cam:
+        uploaded_img = Image.open(cam)
 
-# --- Step 2: Disease Detection ---
+# Process only if image exists
 if uploaded_img:
-    st.image(uploaded_img, caption="Potato Leaf", use_container_width=True)
+    st.image(uploaded_img, caption="Potato Leaf")
     st.write("🔍 Analyzing leaf...")
-    
-    # Simulate ML result
+
     disease = random.choice(list(disease_db.keys()))
     info = disease_db[disease]
 
-    st.success(f"✅ **Detected Disease:** {disease}")
+    st.success(f"✅ Disease Detected: **{disease}**")
     st.write(f"**Symptoms:** {info['Symptoms']}")
     st.write(f"**Recommended Chemical:** {info['Chemical']}")
     st.write(f"**Trade Names:** {info['Trade Names']}")
     st.write(f"**Dosage:** {info['Dosage']}")
-    st.write(f"**Alternative Practices:** {info['Alternatives']}")
+    st.write(f"**Organic/Alternative Option:** {info['Alternatives']}")
 
     st.divider()
 
-    # Constituency & Ward Input
-    st.subheader("📍 Select Your Location (Nyandarua County)")
+    # --- Confirm Location ---
+    st.subheader("📍 Farmer Location Verification")
+    in_nyandarua = st.radio("Are you currently in **Nyandarua County**?", ["Yes", "No"])
+
+    if in_nyandarua == "No":
+        st.error("❗ This service is available only for farmers currently in Nyandarua County.")
+        st.stop()
+
+    # --- Select Constituency and Ward ---
     wards = {
         "Kinangop": ["Engineer", "Gathara", "Magumu"],
         "Ol Kalou": ["Karau", "Mirangine", "Rurii"],
         "Ndaragwa": ["Shamata", "Leshau", "Kiriita"]
     }
 
-    selected_const = st.selectbox("Select Constituency", list(wards.keys()))
-    selected_ward = st.selectbox("Select Ward", wards[selected_const])
+    selected_const = st.selectbox("If you are currently in Nyandarua, which constituency are you in?", list(wards.keys()))
+    selected_ward = st.selectbox("Which ward are you in?", wards[selected_const])
 
-    st.write("🌍 Click to detect GPS location:")
+    st.write("🌍 Click to detect GPS location inside your ward:")
     location = streamlit_geolocation()
 
-    # Distance function
+    # --- Haversine Distance ---
     def haversine(lat1, lon1, lat2, lon2):
         R = 6371
-        dlat = radians(lat2 - lat1)
-        dlon = radians(lon2 - lon1)
-        a = sin(dlat/2)**2 + cos(radians(lat1))*cos(radians(lat2))*sin(dlon/2)**2
-        return 2 * atan2(sqrt(a), sqrt(1-a)) * R
+        dlat = radians(lat2-lat1)
+        dlon = radians(lon2-lon1)
+        a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+        return 2 * atan2(sqrt(a), sqrt(1 - a)) * R
 
+    # Verify GPS
     if location and location.get("latitude") and location.get("longitude"):
-        lat = location["latitude"]
-        lon = location["longitude"]
+        lat, lon = location["latitude"], location["longitude"]
+        st.success(f"📌 GPS Confirmed: ({lat:.4f}, {lon:.4f}) — Nyandarua")
 
-        st.success(f"📌 Your Location: ({lat:.4f}, {lon:.4f})")
+        ward_data = [a for a in suppliers[selected_const] if a["ward"] == selected_ward]
 
-        # Filter agrovets within selected ward
-        ward_agrovet_list = [a for a in suppliers[selected_const] if a["ward"] == selected_ward]
-
-        if not ward_agrovet_list:
-            ward_agrovet_list = suppliers[selected_const]  # fallback
-
-        # Calculate distance for each agrovet
-        for a in ward_agrovet_list:
+        for a in ward_data:
             a["distance"] = haversine(lat, lon, a["lat"], a["lon"])
 
-        nearest = sorted(ward_agrovet_list, key=lambda x: x["distance"])[:3]
+        nearest = sorted(ward_data, key=lambda x: x["distance"])[:3]
 
-        st.subheader("🏪 Nearest Agrovets")
+        st.subheader("🏪 Nearest Verified Agrovets")
         for i, a in enumerate(nearest, start=1):
-            st.write(
-                f"**{i}. {a['name']}**  \n"
-                f"📞 {a['phone']}  \n"
-                f"📍 Ward: {a['ward']}  \n"
-                f"📏 {a['distance']:.2f} km away"
-            )
+            st.write(f"**{i}. {a['name']}** \n📍 Ward: {a['ward']}\n📞 {a['phone']} \n📏 {a['distance']:.2f} km away")
 
+    else:
+        st.info("📍 Please allow location access to continue.")
 else:
-    st.info("📎 Upload or capture a potato leaf image to start.")
+    st.info("📎 Upload or capture a potato leaf image to continue.")
+
 
